@@ -1,0 +1,50 @@
+template_id = "78311000000480003";
+record_resp = zoho.crm.getRecordById("Contacts", record_id);
+address = ifnull(record_resp.get("Mailing_Street"), "") + " " + ifnull(record_resp.get("Mailing_City"), "") + " " + ifnull(record_resp.get("Mailing_State"), "") + " " + ifnull(record_resp.get("Mailing_Zip"), "") + " " + ifnull(record_resp.get("Mailing_Country"), "");
+sign_data = {
+    "templates": {
+        "field_data": {
+            "field_text_data": {
+				"STD-Name": ifnull(record_resp.get("Full_Name"), ""),
+                "STD-Address": address,
+                "STD-Telephone": ifnull(record_resp.get("Mobile"), ""),
+                "STD-Email": ifnull(record_resp.get("Email"), "")
+            },
+            "field_date_data": {
+                "Date - MD": now.toDate().toString("yyyy-MM-dd")
+            }
+        },
+        "actions": [
+            {
+                "recipient_name": ifnull(record_resp.get("Full_Name"), ""),
+                "recipient_email": ifnull(record_resp.get("Email"), ""),
+                "action_id": "78311000000480024",
+                "signing_order": 0,
+                "role": "Student",
+                "verify_recipient": false,
+                "private_notes": ""
+            }
+        ],
+        "notes": ""
+    }
+};
+ 
+email_resp = invokeurl
+[
+	url: "https://sign.zoho.com/api/v1/templates/"+template_id+"/createdocument"
+	type: POST
+	parameters: sign_data.toString()
+	headers: {"content-type": "application/json"}
+	connection: "zoho_sign_conn"
+];
+request_id = email_resp.get("requests").get("request_id");
+new_record_data = {
+	"Name": "Contacts",
+	"Target_Record_ID": record_id,
+	"Sign_Status": "Document Sent for Signing",
+	"Zoho_Sign_pdf_Request_ID": request_id
+};
+if(request_id != null || request_id != ""){
+	info zoho.crm.createRecord("Zoho_Sign_Documents", new_record_data);
+}
+return "Procedure succeeded and Email sent to the Student. Attachment will be added to this record after Student completes the Submission.";
