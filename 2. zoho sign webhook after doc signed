@@ -1,0 +1,99 @@
+crmAPIRequest = {
+  "file_content": null,
+  "headers": {
+    "zsec_user_import_url": [
+      "true"
+    ],
+    "lb_request_id": [
+      "262257d66022715edaf68d3c2229e498"
+    ],
+    "lb_ssl_remote_ip": [
+      "136.143.176.43"
+    ],
+    "lb_http_version": [
+      "HTTP/1.1"
+    ],
+    "req-mi-chain": [
+      "-1407389414:8080"
+    ]
+  },
+  "auth_type": "apikey",
+  "method": "POST",
+  "user_info": {
+    "zgid": 683145397,
+    "org_info": {
+      "name": "Study Village",
+      "id": 683145397
+    },
+    "country": "au",
+    "time_format": "hh:mm a",
+    "name": "Carl Jones",
+    "id": 3796364000000193015,
+    "time_zone": "Australia/Melbourne",
+    "email": "carljones@studyvillage.org",
+    "zuid": "683148097"
+  },
+  "record": {},
+  "params": {},
+  "body": "{\"requests\":{\"request_status\":\"completed\",\"owner_email\":\"carljones@studyvillage.org\",\"document_ids\":[{\"document_name\":\"SV Client Agreement Combined Version \",\"document_size\":155534,\"document_order\":\"0\",\"is_editable\":false,\"total_pages\":17,\"document_id\":\"78311000000599451\"}],\"self_sign\":false,\"owner_id\":\"78311000000004003\",\"request_name\":\"SV Client Agreement Combined Version \",\"modified_time\":1689394459577,\"action_time\":1689394500716,\"is_deleted\":false,\"is_sequential\":true,\"owner_first_name\":\"Carl\",\"request_type_name\":\"Others\",\"owner_last_name\":\"Jones\",\"request_id\":\"78311000000599465\",\"request_type_id\":\"78311000000000135\",\"zsdocumentid\":\"28B7FC9A-FAOCPCKBWATPS9YA-D9BK-NVWYIBD12Y8SIR4PZLQVC\",\"actions\":[{\"verify_recipient\":false,\"action_type\":\"SIGN\",\"action_id\":\"78311000000599469\",\"is_revoked\":false,\"recipient_email\":\"svstudent222@gmail.com\",\"is_embedded\":false,\"signing_order\":1,\"recipient_name\":\"Steve Smith\",\"allow_signing\":false,\"recipient_phonenumber\":\"\",\"recipient_countrycode\":\"\",\"action_status\":\"SIGNED\"}]},\"notifications\":{\"performed_by_email\":\"System Generated\",\"performed_at\":1689394500765,\"country\":\"BANGLADESH\",\"activity\":\"Document has been completed\",\"operation_type\":\"RequestCompleted\",\"latitude\":22.34,\"performed_by_name\":\"System Generated\",\"ip_address\":\"27.147.242.25\",\"longitude\":91.83}}"
+};
+
+crm_api_map = crmAPIRequest.toMap();
+body = crm_api_map.get("body");
+request_id = body.get("requests").get("request_id");
+notifications = body.get("notifications");
+
+
+if(notifications.get("operation_type") == "RequestCompleted")
+{
+	queryMap = Map();
+	queryMap.put("select_query","select Name, Target_Record_ID, Zoho_Sign_pdf_Request_ID, Sign_Status from Zoho_Sign_Documents where Zoho_Sign_pdf_Request_ID = '" + request_id + "'");
+	zoho_sign_document_resp = invokeurl
+	[
+		url :"https://www.zohoapis.com/crm/v2/coql"
+		type :POST
+		parameters:queryMap.toString()
+		connection:"zoho_crm_conn"
+	];
+		info zoho_sign_document_resp;
+	if(zoho_sign_document_resp.get("data") != null && !zoho_sign_document_resp.get("data").isEmpty())
+	{
+		zoho_sign_document_id = zoho_sign_document_resp.get("data").get(0).get("id");
+		student_id = zoho_sign_document_resp.get("data").get(0).get("Target_Record_ID");
+		module_name = zoho_sign_document_resp.get("data").get(0).get("Name");
+		pdf_resp = invokeurl
+[
+	url :"https://sign.zoho.com/api/v1/requests/" + request_id + "/pdf"
+	type :GET
+	headers:{"content-type":"application/json"}
+	connection:"zoho_sign_conn"
+];
+info zoho.crm.attachFile(module_name, student_id, pdf_resp);
+		info zoho.crm.updateRecord("Zoho_Sign_Documents",zoho_sign_document_id,{"Sign_Status":"Client Signed"});
+	}
+}
+/*
+else if(notifications.get("operation_type") == "RequestSigningSuccess" && notifications.get("signing_order") == 1)
+{
+	queryMap = Map();
+	queryMap.put("select_query","select Name, Zoho_Sign_Document_ID from Agents1 where Zoho_Sign_Document_ID = '" + request_id + "'");
+	agents_resp = invokeurl
+	[
+		url :"https://www.zohoapis.com/crm/v2/coql"
+		type :POST
+		parameters:queryMap.toString()
+		connection:"zoho_crm_conn"
+	];
+	info agents_resp;
+	if(agents_resp.get("data") != null && !agents_resp.get("data").isEmpty())
+	{
+		agent_id = agents_resp.get("data").get(0).get("id");
+		agent_name = agents_resp.get("data").get(0).get("Name");
+		info zoho.crm.updateRecord("Agents1",agent_id,{"Agent_Contract_Agreement_Status":"Agent Contract Agreement Completed"});
+		signed_document = zoho.sign.downloadDocument(request_id);
+		signed_document.setFileName("Signed Document for " + agent_name + ".pdf");
+		zoho.crm.attachFile("Agents1",agent_id,signed_document,"zoho_crm_conn");
+	}
+}
+*/
+return "";
